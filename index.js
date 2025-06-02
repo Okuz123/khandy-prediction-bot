@@ -24,17 +24,17 @@ function pad(n, width = 2) {
     return n.toString().padStart(width, '0');
 }
 
-// Calculate the current period number
+// Calculate the current period number (updated to lock base date to June 2, 2025)
 function fetchPeriodNumber() {
     try {
         const now = new Date();
-        const baseTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-        const baseRoundNumber = 9671; // Adjusted to match 11066 at 23:15
-        const diffMinutes = Math.floor((now - baseTime) / 60000);
+        const baseDate = new Date(2025, 5, 2, 0, 0, 0); // Locked to June 2, 2025
+        const baseRoundNumber = 9671;
+        const diffMinutes = Math.floor((now - baseDate) / 60000);
         const currentRoundNumber = baseRoundNumber + diffMinutes;
-        const year = now.getFullYear();
-        const month = pad(now.getMonth() + 1);
-        const day = pad(now.getDate());
+        const year = baseDate.getFullYear();
+        const month = pad(baseDate.getMonth() + 1);
+        const day = pad(baseDate.getDate());
         const round = pad(currentRoundNumber, 5);
         const systemPrefix = "1000";
         return `${year}${month}${day}${systemPrefix}${round}`;
@@ -44,7 +44,26 @@ function fetchPeriodNumber() {
     }
 }
 
-// Prediction methods
+// Generate deterministic numbers from the period number
+function generateNumbersFromPeriod(period) {
+    try {
+        // Convert period to a number and use it as a seed
+        const seed = parseInt(period.slice(-5)); // Use last 5 digits of period (the round number)
+        const numbers = [];
+        let currentSeed = seed;
+
+        for (let i = 0; i < 3; i++) {
+            // Simple deterministic transformation
+            currentSeed = (currentSeed * 9301 + 49297) % 233280; // Linear congruential generator
+            numbers.push(Math.floor((currentSeed / 233280) * 10)); // Map to 0-9
+        }
+        return numbers;
+    } catch (error) {
+        throw new Error(`Error generating numbers from period: ${error.message}`);
+    }
+}
+
+// Prediction methods (using deterministic numbers)
 function matrix(inputs) {
     try {
         if (!Array.isArray(inputs) || inputs.length !== 3 || inputs.some(num => isNaN(num) || num < 0 || num > 9)) {
@@ -104,11 +123,6 @@ function formatAutoPrediction(number) {
     }
 }
 
-// Generate random numbers for automatic prediction
-function generateRandomNumbers() {
-    return Array.from({ length: 3 }, () => Math.floor(Math.random() * 10));
-}
-
 // Telegram Bot Commands
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
@@ -144,11 +158,9 @@ bot.on('message', (msg) => {
 
     if (text === 'Automatically Prediction') {
         try {
-            const randomNumbers = generateRandomNumbers();
             const period = fetchPeriodNumber();
-
-            // Use Pi-based for auto prediction
-            const piPrediction = piBased(randomNumbers);
+            const numbers = generateNumbersFromPeriod(period); // Deterministic numbers based on period
+            const piPrediction = piBased(numbers);
             const piResult = formatAutoPrediction(piPrediction);
 
             const message = `
@@ -182,17 +194,17 @@ Color: ${piResult.color}
         }
 
         try {
-            // Calculate predictions
-            const matrixPrediction = matrix(numbers);
-            const piPrediction = piBased(numbers);
+            const period = fetchPeriodNumber();
+            const deterministicNumbers = generateNumbersFromPeriod(period); // Use period-based numbers instead of user input for consistency
+            const matrixPrediction = matrix(deterministicNumbers);
+            const piPrediction = piBased(deterministicNumbers);
             const matrixResult = formatPrediction(matrixPrediction);
             const piResult = formatPrediction(piPrediction);
-            const period = fetchPeriodNumber();
 
             const message = `
 *Prediction Result*
 
-**Input Numbers:** ${numbers.join(', ')}
+**Input Numbers (User Provided):** ${numbers.join(', ')}
 **Period Number:** ${period}
 
 *Matrix Prediction:*
