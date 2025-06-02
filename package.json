@@ -1,6 +1,6 @@
 {
     "name": "khandy-prediction-bot-render",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "Telegram bot for Khandy Prediction using Pi-based and Matrix methods",
     "main": "index.js",
     "scripts": {
