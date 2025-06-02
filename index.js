@@ -26,7 +26,7 @@ function pad(n, width = 2) {
 }
 
 // Calculate the current period number
-async function fetchPeriodNumber() {
+function fetchPeriodNumber() {
     try {
         const now = new Date();
         const baseTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
@@ -40,16 +40,16 @@ async function fetchPeriodNumber() {
         const systemPrefix = "1000";
         return `${year}${month}${day}${systemPrefix}${round}`;
     } catch (error) {
-        console.error('Error calculating period:', error);
+        console.error('Error calculating period:', error.message);
         return 'Unknown Period';
     }
 }
 
 // Prediction methods
-async function matrix(inputs) {
+function matrix(inputs) {
     try {
-        if (!Array.isArray(inputs) || inputs.length !== 3 || inputs.some(num => isNaN(num))) {
-            throw new Error('Invalid input for Matrix prediction');
+        if (!Array.isArray(inputs) || inputs.length !== 3 || inputs.some(num => isNaN(num) || num < 0 || num > 9)) {
+            throw new Error('Invalid input for Matrix prediction: Must be an array of 3 numbers between 0 and 9');
         }
         const sum = inputs.reduce((a, b) => a + b, 0);
         return sum % 10;
@@ -58,14 +58,18 @@ async function matrix(inputs) {
     }
 }
 
-async function piBased(inputs) {
+function piBased(inputs) {
     try {
-        if (!Array.isArray(inputs) || inputs.length !== 3 || inputs.some(num => isNaN(num))) {
-            throw new Error('Invalid input for Pi-based prediction');
+        if (!Array.isArray(inputs) || inputs.length !== 3 || inputs.some(num => isNaN(num) || num < 0 || num > 9)) {
+            throw new Error('Invalid input for Pi-based prediction: Must be an array of 3 numbers between 0 and 9');
         }
         const inputSum = inputs.reduce((a, b) => a + b, 0);
         const index = inputSum % PI_DIGITS.length;
-        return parseInt(PI_DIGITS[index]);
+        const result = parseInt(PI_DIGITS[index]);
+        if (isNaN(result)) {
+            throw new Error('Pi-based prediction returned invalid result');
+        }
+        return result;
     } catch (error) {
         throw new Error(`Pi-based prediction failed: ${error.message}`);
     }
@@ -75,7 +79,7 @@ async function piBased(inputs) {
 function formatPrediction(number) {
     try {
         if (isNaN(number) || number < 0 || number > 9) {
-            throw new Error('Invalid number for formatting');
+            throw new Error('Invalid number for formatting: Must be between 0 and 9');
         }
         const bigSmall = number >= 0 && number <= 4 ? 'Small' : 'Big';
         const signal = number % 2 === 0 ? 'Even' : 'Odd';
@@ -99,7 +103,7 @@ bot.onText(/\/predict/, (msg) => {
     bot.sendMessage(chatId, 'Please enter the last 3 numbers (one at a time, e.g., 1, then 2, then 3).');
 });
 
-bot.onText(/\/predictai/, async (msg) => {
+bot.onText(/\/predictai/, (msg) => {
     const chatId = msg.chat.id;
     const numbers = userInputs.get(chatId);
 
@@ -112,11 +116,11 @@ bot.onText(/\/predictai/, async (msg) => {
 
     try {
         // Calculate predictions
-        const matrixPrediction = await matrix(numbers);
-        const piPrediction = await piBased(numbers);
+        const matrixPrediction = matrix(numbers);
+        const piPrediction = piBased(numbers);
         const matrixResult = formatPrediction(matrixPrediction);
         const piResult = formatPrediction(piPrediction);
-        const period = await fetchPeriodNumber();
+        const period = fetchPeriodNumber();
 
         const message = `
 *Prediction Result*
@@ -141,13 +145,13 @@ Color: ${piResult.color}
         userInputs.delete(chatId);
     } catch (error) {
         bot.sendMessage(chatId, `Error making prediction: ${error.message}. Please try again.`);
-        console.error('Prediction error:', error);
+        console.error('Prediction error:', error.message);
         userStates.delete(chatId);
         userInputs.delete(chatId);
     }
 });
 
-bot.on('message', async (msg) => {
+bot.on('message', (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
@@ -181,7 +185,7 @@ bot.on('message', async (msg) => {
 });
 
 bot.on('polling_error', (error) => {
-    console.error('Polling error:', error);
+    console.error('Polling error:', error.message);
 });
 
 console.log('Telegram bot is running on Render...');
