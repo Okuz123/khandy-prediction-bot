@@ -25,12 +25,12 @@ function pad(n, width = 2) {
     return n.toString().padStart(width, '0');
 }
 
-// Calculate the current period number
+// Calculate the current period number (updated from HTML code)
 async function fetchPeriodNumber() {
     try {
         const now = new Date();
         const baseTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-        const baseRoundNumber = 9671;
+        const baseRoundNumber = 9671; // Adjusted to match 11066 at 23:15
         const diffMinutes = Math.floor((now - baseTime) / 60000);
         const currentRoundNumber = baseRoundNumber + diffMinutes;
         const year = now.getFullYear();
@@ -75,7 +75,55 @@ bot.onText(/\/predict/, (msg) => {
     const chatId = msg.chat.id;
     userStates.set(chatId, 'awaiting_numbers');
     userInputs.set(chatId, []);
-    bot.sendMessage(chatId, 'Please enter the last 3 numbers (one at a time, e.g., 5, then 3, then 8).');
+    bot.sendMessage(chatId, 'Please enter the last 3 numbers (one at a time, e.g., 1, then 2, then 3).');
+});
+
+bot.onText(/\/predictai/, async (msg) => {
+    const chatId = msg.chat.id;
+    const numbers = userInputs.get(chatId);
+
+    if (!numbers || numbers.length !== 3) {
+        bot.sendMessage(chatId, 'Error: Please start over with /predict and enter 3 numbers.');
+        userStates.delete(chatId);
+        userInputs.delete(chatId);
+        return;
+    }
+
+    try {
+        // Calculate predictions
+        const matrixPrediction = await matrix(numbers);
+        const piPrediction = await piBased(numbers);
+        const matrixResult = formatPrediction(matrixPrediction);
+        const piResult = formatPrediction(piPrediction);
+        const period = await fetchPeriodNumber();
+
+        const message = `
+*Prediction Result*
+
+**Input Numbers:** ${numbers.join(', ')}
+**Period Number:** ${period}
+
+*Matrix Prediction:*
+Number: ${matrixResult.number}
+Signal: ${matrixResult.bigSmall}
+Color: ${matrixResult.color}
+
+*Pi-Based Prediction:*
+Number: ${piResult.number}
+Signal: ${piResult.bigSmall}
+Color: ${piResult.color}
+        `;
+        bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+
+        // Reset state
+        userStates.delete(chatId);
+        userInputs.delete(chatId);
+    } catch (error) {
+        bot.sendMessage(chatId, 'Error making prediction. Please try again.');
+        console.error('Prediction error:', error);
+        userStates.delete(chatId);
+        userInputs.delete(chatId);
+    }
 });
 
 bot.on('message', async (msg) => {
@@ -101,52 +149,8 @@ bot.on('message', async (msg) => {
             userInputs.set(chatId, numbers);
         } else {
             userInputs.set(chatId, numbers);
-            userStates.set(chatId, 'awaiting_predict');
-            bot.sendMessage(chatId, `Numbers received: ${numbers.join(', ')}. Reply with "Predict now" to get the prediction.`);
-        }
-    } else if (state === 'awaiting_predict' && text.toLowerCase() === 'predict now') {
-        const numbers = userInputs.get(chatId);
-        if (!numbers || numbers.length !== 3) {
-            bot.sendMessage(chatId, 'Error: Please start over with /predict.');
-            userStates.delete(chatId);
-            userInputs.delete(chatId);
-            return;
-        }
-
-        try {
-            // Calculate predictions
-            const matrixPrediction = await matrix(numbers);
-            const piPrediction = await piBased(numbers);
-            const matrixResult = formatPrediction(matrixPrediction);
-            const piResult = formatPrediction(piPrediction);
-            const period = await fetchPeriodNumber();
-
-            const message = `
-*Prediction Result*
-
-**Input Numbers:** ${numbers.join(', ')}
-**Period Number:** ${period}
-
-*Matrix Prediction:*
-Number: ${matrixResult.number}
-Signal: ${matrixResult.bigSmall}
-Color: ${matrixResult.color}
-
-*Pi-Based Prediction:*
-Number: ${piResult.number}
-Signal: ${piResult.bigSmall}
-Color: ${piResult.color}
-            `;
-            bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-
-            // Reset state
-            userStates.delete(chatId);
-            userInputs.delete(chatId);
-        } catch (error) {
-            bot.sendMessage(chatId, 'Error making prediction. Please try again.');
-            console.error('Prediction error:', error);
-            userStates.delete(chatId);
-            userInputs.delete(chatId);
+            userStates.delete(chatId); // No need for further state
+            bot.sendMessage(chatId, `Numbers received: ${numbers.join(', ')}. Tap the command below to get the prediction:\n\n/predictai`);
         }
     } else {
         bot.sendMessage(chatId, 'Please use /predict to start a prediction.');
