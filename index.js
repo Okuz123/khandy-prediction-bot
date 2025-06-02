@@ -25,7 +25,7 @@ function pad(n, width = 2) {
     return n.toString().padStart(width, '0');
 }
 
-// Calculate the current period number (updated from HTML code)
+// Calculate the current period number
 async function fetchPeriodNumber() {
     try {
         const now = new Date();
@@ -47,22 +47,43 @@ async function fetchPeriodNumber() {
 
 // Prediction methods
 async function matrix(inputs) {
-    const sum = inputs.reduce((a, b) => a + b, 0);
-    return (sum % 10);
+    try {
+        if (!Array.isArray(inputs) || inputs.length !== 3 || inputs.some(num => isNaN(num))) {
+            throw new Error('Invalid input for Matrix prediction');
+        }
+        const sum = inputs.reduce((a, b) => a + b, 0);
+        return sum % 10;
+    } catch (error) {
+        throw new Error(`Matrix prediction failed: ${error.message}`);
+    }
 }
 
 async function piBased(inputs) {
-    const inputSum = inputs.reduce((a, b) => a + b, 0);
-    const index = inputSum % PI_DIGITS.length;
-    return parseInt(PI_DIGITS[index]);
+    try {
+        if (!Array.isArray(inputs) || inputs.length !== 3 || inputs.some(num => isNaN(num))) {
+            throw new Error('Invalid input for Pi-based prediction');
+        }
+        const inputSum = inputs.reduce((a, b) => a + b, 0);
+        const index = inputSum % PI_DIGITS.length;
+        return parseInt(PI_DIGITS[index]);
+    } catch (error) {
+        throw new Error(`Pi-based prediction failed: ${error.message}`);
+    }
 }
 
 // Format prediction result
 function formatPrediction(number) {
-    const bigSmall = number >= 0 && number <= 4 ? 'Small' : 'Big';
-    const signal = number % 2 === 0 ? 'Even' : 'Odd';
-    const color = signal === 'Even' ? 'Green 💚' : 'Red ♥️';
-    return { number, bigSmall, color };
+    try {
+        if (isNaN(number) || number < 0 || number > 9) {
+            throw new Error('Invalid number for formatting');
+        }
+        const bigSmall = number >= 0 && number <= 4 ? 'Small' : 'Big';
+        const signal = number % 2 === 0 ? 'Even' : 'Odd';
+        const color = signal === 'Even' ? 'Green 💚' : 'Red ♥️';
+        return { number, bigSmall, color };
+    } catch (error) {
+        throw new Error(`Formatting prediction failed: ${error.message}`);
+    }
 }
 
 // Telegram Bot Commands
@@ -83,7 +104,7 @@ bot.onText(/\/predictai/, async (msg) => {
     const numbers = userInputs.get(chatId);
 
     if (!numbers || numbers.length !== 3) {
-        bot.sendMessage(chatId, 'Error: Please start over with /predict and enter 3 numbers.');
+        bot.sendMessage(chatId, 'Error: Please start over with /predict and enter exactly 3 numbers.');
         userStates.delete(chatId);
         userInputs.delete(chatId);
         return;
@@ -119,7 +140,7 @@ Color: ${piResult.color}
         userStates.delete(chatId);
         userInputs.delete(chatId);
     } catch (error) {
-        bot.sendMessage(chatId, 'Error making prediction. Please try again.');
+        bot.sendMessage(chatId, `Error making prediction: ${error.message}. Please try again.`);
         console.error('Prediction error:', error);
         userStates.delete(chatId);
         userInputs.delete(chatId);
@@ -133,6 +154,10 @@ bot.on('message', async (msg) => {
     if (text.startsWith('/')) return; // Ignore commands
 
     const state = userStates.get(chatId);
+    if (!state) {
+        bot.sendMessage(chatId, 'Please use /predict to start a prediction.');
+        return;
+    }
 
     if (state === 'awaiting_numbers') {
         const number = parseInt(text);
@@ -141,7 +166,7 @@ bot.on('message', async (msg) => {
             return;
         }
 
-        const numbers = userInputs.get(chatId);
+        const numbers = userInputs.get(chatId) || [];
         numbers.push(number);
 
         if (numbers.length < 3) {
@@ -152,9 +177,11 @@ bot.on('message', async (msg) => {
             userStates.delete(chatId); // No need for further state
             bot.sendMessage(chatId, `Numbers received: ${numbers.join(', ')}. Tap the command below to get the prediction:\n\n/predictai`);
         }
-    } else {
-        bot.sendMessage(chatId, 'Please use /predict to start a prediction.');
     }
+});
+
+bot.on('polling_error', (error) => {
+    console.error('Polling error:', error);
 });
 
 console.log('Telegram bot is running on Render...');
