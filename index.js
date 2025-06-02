@@ -4,9 +4,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const token = '8151189719:AAHAHPFITVrrG0nLPlWhflVJhz0B8GUITzo';
 const bot = new TelegramBot(token, { polling: true });
 
-// Store user states and input numbers
+// Store user states
 const userStates = new Map();
-const userInputs = new Map();
 
 // Pi digits for prediction
 const PI_DIGITS = '1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679' +
@@ -75,7 +74,7 @@ function piBased(inputs) {
     }
 }
 
-// Format prediction result
+// Format prediction result for manual input (with number)
 function formatPrediction(number) {
     try {
         if (isNaN(number) || number < 0 || number > 9) {
@@ -90,39 +89,107 @@ function formatPrediction(number) {
     }
 }
 
+// Format prediction result for automatic prediction (Big/Small and color only)
+function formatAutoPrediction(number) {
+    try {
+        if (isNaN(number) || number < 0 || number > 9) {
+            throw new Error('Invalid number for formatting: Must be between 0 and 9');
+        }
+        const bigSmall = number >= 0 && number <= 4 ? 'Small' : 'Big';
+        const signal = number % 2 === 0 ? 'Even' : 'Odd';
+        const color = signal === 'Even' ? 'Green 💚' : 'Red ♥️';
+        return { bigSmall, color };
+    } catch (error) {
+        throw new Error(`Formatting auto prediction failed: ${error.message}`);
+    }
+}
+
+// Generate random numbers for automatic prediction
+function generateRandomNumbers() {
+    return Array.from({ length: 3 }, () => Math.floor(Math.random() * 10));
+}
+
 // Telegram Bot Commands
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    bot.sendMessage(chatId, 'Welcome to Black and White KHNDY PREDICTION Bot!\n\nCommands:\n/predict - Make a prediction using Pi-based and Matrix methods');
+    if (msg.from.id === bot.getMe().id) return; // Prevent bot from responding to itself
+
+    const keyboard = {
+        reply_markup: {
+            keyboard: [
+                ['Input Manually Numbers Prediction'],
+                ['Automatically Prediction']
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: false
+        }
+    };
+
+    bot.sendMessage(chatId, 'Welcome to Black and White KHNDY PREDICTION Bot!\n\nChoose an option below:', keyboard);
 });
 
-bot.onText(/\/predict/, (msg) => {
+bot.on('message', (msg) => {
     const chatId = msg.chat.id;
-    userStates.set(chatId, 'awaiting_numbers');
-    userInputs.set(chatId, []);
-    bot.sendMessage(chatId, 'Please enter the last 3 numbers (one at a time, e.g., 1, then 2, then 3).');
-});
+    const text = msg.text;
 
-bot.onText(/\/predictai/, (msg) => {
-    const chatId = msg.chat.id;
-    const numbers = userInputs.get(chatId);
+    if (msg.from.id === bot.getMe().id) return; // Prevent bot from responding to itself
 
-    if (!numbers || numbers.length !== 3) {
-        bot.sendMessage(chatId, 'Error: Please start over with /predict and enter exactly 3 numbers.');
-        userStates.delete(chatId);
-        userInputs.delete(chatId);
+    const state = userStates.get(chatId);
+
+    if (text === 'Input Manually Numbers Prediction') {
+        userStates.set(chatId, 'awaiting_manual_numbers');
+        bot.sendMessage(chatId, 'add 3 manually numbers as\n\n1) ...\n2) ...\n3) ...\n\nCopy it and in place of ... Replace with manual numbers and send it to bot');
         return;
     }
 
-    try {
-        // Calculate predictions
-        const matrixPrediction = matrix(numbers);
-        const piPrediction = piBased(numbers);
-        const matrixResult = formatPrediction(matrixPrediction);
-        const piResult = formatPrediction(piPrediction);
-        const period = fetchPeriodNumber();
+    if (text === 'Automatically Prediction') {
+        try {
+            const randomNumbers = generateRandomNumbers();
+            const period = fetchPeriodNumber();
 
-        const message = `
+            // Use Pi-based for auto prediction
+            const piPrediction = piBased(randomNumbers);
+            const piResult = formatAutoPrediction(piPrediction);
+
+            const message = `
+*Automatic Prediction Result*
+
+**Period Number:** ${period}
+
+*Prediction:*
+Signal: ${piResult.bigSmall}
+Color: ${piResult.color}
+            `;
+            bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+        } catch (error) {
+            bot.sendMessage(chatId, `Error making automatic prediction: ${error.message}. Please try again.`);
+            console.error('Automatic prediction error:', error.message);
+        }
+        return;
+    }
+
+    if (state === 'awaiting_manual_numbers') {
+        // Parse the user's message
+        const lines = text.split('\n').filter(line => line.trim().length > 0);
+        const numbers = lines.map(line => {
+            const match = line.match(/\d+\)\s*(\d+)/);
+            return match ? parseInt(match[1]) : null;
+        }).filter(num => num !== null);
+
+        if (numbers.length !== 3 || numbers.some(num => isNaN(num) || num < 0 || num > 9)) {
+            bot.sendMessage(chatId, 'Invalid format or numbers. Please use the format:\n\n1) 1\n2) 2\n3) 3\n\nNumbers must be between 0 and 9.');
+            return;
+        }
+
+        try {
+            // Calculate predictions
+            const matrixPrediction = matrix(numbers);
+            const piPrediction = piBased(numbers);
+            const matrixResult = formatPrediction(matrixPrediction);
+            const piResult = formatPrediction(piPrediction);
+            const period = fetchPeriodNumber();
+
+            const message = `
 *Prediction Result*
 
 **Input Numbers:** ${numbers.join(', ')}
@@ -137,51 +204,22 @@ Color: ${matrixResult.color}
 Number: ${piResult.number}
 Signal: ${piResult.bigSmall}
 Color: ${piResult.color}
-        `;
-        bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+            `;
+            bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
 
-        // Reset state
-        userStates.delete(chatId);
-        userInputs.delete(chatId);
-    } catch (error) {
-        bot.sendMessage(chatId, `Error making prediction: ${error.message}. Please try again.`);
-        console.error('Prediction error:', error.message);
-        userStates.delete(chatId);
-        userInputs.delete(chatId);
-    }
-});
-
-bot.on('message', (msg) => {
-    const chatId = msg.chat.id;
-    const text = msg.text;
-
-    if (text.startsWith('/')) return; // Ignore commands
-
-    const state = userStates.get(chatId);
-    if (!state) {
-        bot.sendMessage(chatId, 'Please use /predict to start a prediction.');
+            // Reset state
+            userStates.delete(chatId);
+        } catch (error) {
+            bot.sendMessage(chatId, `Error making prediction: ${error.message}. Please try again.`);
+            console.error('Prediction error:', error.message);
+            userStates.delete(chatId);
+        }
         return;
     }
 
-    if (state === 'awaiting_numbers') {
-        const number = parseInt(text);
-        if (isNaN(number) || number < 0 || number > 9) {
-            bot.sendMessage(chatId, 'Please enter a valid number between 0 and 9.');
-            return;
-        }
+    if (text.startsWith('/')) return; // Ignore other commands
 
-        const numbers = userInputs.get(chatId) || [];
-        numbers.push(number);
-
-        if (numbers.length < 3) {
-            bot.sendMessage(chatId, `Number ${numbers.length} received: ${number}. Please enter the next number.`);
-            userInputs.set(chatId, numbers);
-        } else {
-            userInputs.set(chatId, numbers);
-            userStates.delete(chatId); // No need for further state
-            bot.sendMessage(chatId, `Numbers received: ${numbers.join(', ')}. Tap the command below to get the prediction:\n\n/predictai`);
-        }
-    }
+    bot.sendMessage(chatId, 'Please choose an option:\n- Input Manually Numbers Prediction\n- Automatically Prediction');
 });
 
 bot.on('polling_error', (error) => {
