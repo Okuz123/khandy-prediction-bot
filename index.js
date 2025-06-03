@@ -4,10 +4,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const token = '8151189719:AAEEp5rgTK9f4Hb2rEexCBwvBMeaIlgZfbA';
 const bot = new TelegramBot(token, { polling: true });
 
-// Store user states and referral counts
+// Store user states
 const userStates = new Map();
-const referrals = new Map(); // Tracks who referred whom
-const referralCounts = new Map(); // Tracks how many referrals a user has
 
 // Motivational quotes
 const motivationalQuotes = [
@@ -139,40 +137,10 @@ function formatAutoPrediction(number) {
     }
 }
 
-// Check if user is unlocked (has referred 3 people)
-function isUserUnlocked(userId) {
-    return (referralCounts.get(userId) || 0) >= 3;
-}
-
 // Telegram Bot Commands
-bot.onText(/\/start(?:\s+(\d+))?/, (msg, match) => {
+bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    const referrerId = match[1] ? parseInt(match[1]) : null;
-
     if (msg.from.id === bot.getMe().id) return; // Prevent bot from responding to itself
-
-    // Handle referrals
-    if (referrerId && referrerId !== userId) {
-        const referredUsers = referrals.get(referrerId) || new Set();
-        if (!referredUsers.has(userId)) {
-            referredUsers.add(userId);
-            referrals.set(referrerId, referredUsers);
-            referralCounts.set(referrerId, referredUsers.size);
-            if (referredUsers.size === 3) {
-                bot.sendMessage(referrerId, "🎉 Congratulations! You've referred 3 people and unlocked the prediction features!");
-            } else {
-                bot.sendMessage(referrerId, `You've referred ${referredUsers.size}/3 people. Keep sharing to unlock predictions!`);
-            }
-        }
-    }
-
-    // Check if user is unlocked
-    if (!isUserUnlocked(userId)) {
-        const referralLink = `https://t.me/${bot.getMe().then(me => me.username)}?start=${userId}`;
-        bot.sendMessage(chatId, `🔒 To unlock predictions, please share this bot with 3 people using your referral link:\n\n${referralLink}\n\nYou've currently referred ${referralCounts.get(userId) || 0}/3 people.`);
-        return;
-    }
 
     const keyboard = {
         reply_markup: {
@@ -185,22 +153,14 @@ bot.onText(/\/start(?:\s+(\d+))?/, (msg, match) => {
         }
     };
 
-    bot.sendMessage(chatId, 'Welcome to Black and White KHNDY PREDICTION Bot!\n\nChoose an option below:', keyboard);
+    bot.sendMessage(chatId, 'Welcome to Black and White KHNDY PREDICTION Bot!\n\nJoin our group for more updates: https://t.me/redenvlo\n\nChoose an option below:', keyboard);
 });
 
 bot.on('message', (msg) => {
     const chatId = msg.chat.id;
-    const userId = msg.from.id;
     const text = msg.text;
 
     if (msg.from.id === bot.getMe().id) return; // Prevent bot from responding to itself
-
-    // Check if user is unlocked
-    if (!isUserUnlocked(userId)) {
-        const referralLink = `https://t.me/${bot.getMe().then(me => me.username)}?start=${userId}`;
-        bot.sendMessage(chatId, `🔒 To unlock predictions, please share this bot with 3 people using your referral link:\n\n${referralLink}\n\nYou've currently referred ${referralCounts.get(userId) || 0}/3 people.`);
-        return;
-    }
 
     const state = userStates.get(chatId);
 
@@ -229,6 +189,8 @@ Color: ${piResult.color}
 
 *Motivational Quote:*
 ${quote}
+
+Join our group for more updates: https://t.me/redenvlo
             `;
             bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
         } catch (error) {
@@ -278,6 +240,8 @@ Color: ${piResult.color}
 
 *Motivational Quote:*
 ${quote}
+
+Join our group for more updates: https://t.me/redenvlo
             `;
             bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
 
