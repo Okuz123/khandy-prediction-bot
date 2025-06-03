@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 
 // Replace with your Telegram Bot Token
-const token = '8151189719:AAFBBICxhlQW1bDsGn8YgZR5HvpCsUNW8wg';
+const token = '8151189719:AAEEp5rgTK9f4Hb2rEexCBwvBMeaIlgZfbA';
 const bot = new TelegramBot(token, { polling: true });
 
 // Store user states
@@ -24,17 +24,17 @@ function pad(n, width = 2) {
     return n.toString().padStart(width, '0');
 }
 
-// Calculate the current period number (locked base date: June 2, 2025)
+// Calculate the current period number (base time: today at 00:00:00)
 function fetchPeriodNumber() {
     try {
         const now = new Date();
-        const baseDate = new Date(2025, 5, 2, 0, 0, 0); // Locked to June 2, 2025
+        const baseTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         const baseRoundNumber = 9671;
-        const diffMinutes = Math.floor((now - baseDate) / 60000);
+        const diffMinutes = Math.floor((now - baseTime) / 60000);
         const currentRoundNumber = baseRoundNumber + diffMinutes;
-        const year = baseDate.getFullYear();
-        const month = pad(baseDate.getMonth() + 1);
-        const day = pad(baseDate.getDate());
+        const year = now.getFullYear();
+        const month = pad(now.getMonth() + 1);
+        const day = pad(now.getDate());
         const round = pad(currentRoundNumber, 5);
         const systemPrefix = "1000";
         return `${year}${month}${day}${systemPrefix}${round}`;
