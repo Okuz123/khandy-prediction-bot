@@ -24,7 +24,7 @@ function pad(n, width = 2) {
     return n.toString().padStart(width, '0');
 }
 
-// Calculate the current period number (updated to lock base date to June 2, 2025)
+// Calculate the current period number (locked base date: June 2, 2025)
 function fetchPeriodNumber() {
     try {
         const now = new Date();
@@ -47,13 +47,11 @@ function fetchPeriodNumber() {
 // Generate deterministic numbers from the period number
 function generateNumbersFromPeriod(period) {
     try {
-        // Convert period to a number and use it as a seed
         const seed = parseInt(period.slice(-5)); // Use last 5 digits of period (the round number)
         const numbers = [];
         let currentSeed = seed;
 
         for (let i = 0; i < 3; i++) {
-            // Simple deterministic transformation
             currentSeed = (currentSeed * 9301 + 49297) % 233280; // Linear congruential generator
             numbers.push(Math.floor((currentSeed / 233280) * 10)); // Map to 0-9
         }
@@ -195,7 +193,7 @@ Color: ${piResult.color}
 
         try {
             const period = fetchPeriodNumber();
-            const deterministicNumbers = generateNumbersFromPeriod(period); // Use period-based numbers instead of user input for consistency
+            const deterministicNumbers = generateNumbersFromPeriod(period); // Use period-based numbers
             const matrixPrediction = matrix(deterministicNumbers);
             const piPrediction = piBased(deterministicNumbers);
             const matrixResult = formatPrediction(matrixPrediction);
