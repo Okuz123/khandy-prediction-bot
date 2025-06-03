@@ -4,8 +4,26 @@ const TelegramBot = require('node-telegram-bot-api');
 const token = '8151189719:AAEEp5rgTK9f4Hb2rEexCBwvBMeaIlgZfbA';
 const bot = new TelegramBot(token, { polling: true });
 
-// Store user states
+// Store user states and referral counts
 const userStates = new Map();
+const referrals = new Map(); // Tracks who referred whom
+const referralCounts = new Map(); // Tracks how many referrals a user has
+
+// Motivational quotes
+const motivationalQuotes = [
+    "Believe you can and you're halfway there. – Theodore Roosevelt",
+    "The only way to do great work is to love what you do. – Steve Jobs",
+    "Success is not the absence of obstacles, but the courage to push through. – Unknown",
+    "Your time is limited, don’t waste it living someone else’s life. – Steve Jobs",
+    "Hardships often prepare ordinary people for an extraordinary destiny. – C.S. Lewis",
+    "Don’t watch the clock; do what it does. Keep going. – Sam Levenson",
+    "The future belongs to those who believe in the beauty of their dreams. – Eleanor Roosevelt"
+];
+
+// Get a random motivational quote
+function getRandomQuote() {
+    return motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
+}
 
 // Pi digits for prediction
 const PI_DIGITS = '1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679' +
@@ -121,10 +139,40 @@ function formatAutoPrediction(number) {
     }
 }
 
+// Check if user is unlocked (has referred 3 people)
+function isUserUnlocked(userId) {
+    return (referralCounts.get(userId) || 0) >= 3;
+}
+
 // Telegram Bot Commands
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start(?:\s+(\d+))?/, (msg, match) => {
     const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    const referrerId = match[1] ? parseInt(match[1]) : null;
+
     if (msg.from.id === bot.getMe().id) return; // Prevent bot from responding to itself
+
+    // Handle referrals
+    if (referrerId && referrerId !== userId) {
+        const referredUsers = referrals.get(referrerId) || new Set();
+        if (!referredUsers.has(userId)) {
+            referredUsers.add(userId);
+            referrals.set(referrerId, referredUsers);
+            referralCounts.set(referrerId, referredUsers.size);
+            if (referredUsers.size === 3) {
+                bot.sendMessage(referrerId, "🎉 Congratulations! You've referred 3 people and unlocked the prediction features!");
+            } else {
+                bot.sendMessage(referrerId, `You've referred ${referredUsers.size}/3 people. Keep sharing to unlock predictions!`);
+            }
+        }
+    }
+
+    // Check if user is unlocked
+    if (!isUserUnlocked(userId)) {
+        const referralLink = `https://t.me/${bot.getMe().then(me => me.username)}?start=${userId}`;
+        bot.sendMessage(chatId, `🔒 To unlock predictions, please share this bot with 3 people using your referral link:\n\n${referralLink}\n\nYou've currently referred ${referralCounts.get(userId) || 0}/3 people.`);
+        return;
+    }
 
     const keyboard = {
         reply_markup: {
@@ -142,9 +190,17 @@ bot.onText(/\/start/, (msg) => {
 
 bot.on('message', (msg) => {
     const chatId = msg.chat.id;
+    const userId = msg.from.id;
     const text = msg.text;
 
     if (msg.from.id === bot.getMe().id) return; // Prevent bot from responding to itself
+
+    // Check if user is unlocked
+    if (!isUserUnlocked(userId)) {
+        const referralLink = `https://t.me/${bot.getMe().then(me => me.username)}?start=${userId}`;
+        bot.sendMessage(chatId, `🔒 To unlock predictions, please share this bot with 3 people using your referral link:\n\n${referralLink}\n\nYou've currently referred ${referralCounts.get(userId) || 0}/3 people.`);
+        return;
+    }
 
     const state = userStates.get(chatId);
 
@@ -160,6 +216,7 @@ bot.on('message', (msg) => {
             const numbers = generateNumbersFromPeriod(period); // Deterministic numbers based on period
             const piPrediction = piBased(numbers);
             const piResult = formatAutoPrediction(piPrediction);
+            const quote = getRandomQuote();
 
             const message = `
 *Automatic Prediction Result*
@@ -169,6 +226,9 @@ bot.on('message', (msg) => {
 *Prediction:*
 Signal: ${piResult.bigSmall}
 Color: ${piResult.color}
+
+*Motivational Quote:*
+${quote}
             `;
             bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
         } catch (error) {
@@ -198,6 +258,7 @@ Color: ${piResult.color}
             const piPrediction = piBased(deterministicNumbers);
             const matrixResult = formatPrediction(matrixPrediction);
             const piResult = formatPrediction(piPrediction);
+            const quote = getRandomQuote();
 
             const message = `
 *Prediction Result*
@@ -214,6 +275,9 @@ Color: ${matrixResult.color}
 Number: ${piResult.number}
 Signal: ${piResult.bigSmall}
 Color: ${piResult.color}
+
+*Motivational Quote:*
+${quote}
             `;
             bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
 
