@@ -40,17 +40,23 @@ function pad(n, width = 2) {
     return n.toString().padStart(width, '0');
 }
 
-// Calculate the current period number (base time: today at 00:00:00)
+// Calculate the current period number (base time: today at 00:00:00 in Oregon PDT, UTC-7)
 function fetchPeriodNumber() {
     try {
+        // Get current time in UTC
         const now = new Date();
-        const baseTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        // Convert to PDT (UTC-7) - Oregon is on PDT in June 2025
+        const pdtOffsetMinutes = -7 * 60; // UTC-7
+        const pdtTime = new Date(now.getTime() + (pdtOffsetMinutes * 60 * 1000));
+
+        // Base time: today at 00:00:00 in PDT
+        const baseTime = new Date(pdtTime.getFullYear(), pdtTime.getMonth(), pdtTime.getDate(), 0, 0, 0);
         const baseRoundNumber = 9671;
-        const diffMinutes = Math.floor((now - baseTime) / 60000);
+        const diffMinutes = Math.floor((pdtTime - baseTime) / 60000);
         const currentRoundNumber = baseRoundNumber + diffMinutes;
-        const year = now.getFullYear();
-        const month = pad(now.getMonth() + 1);
-        const day = pad(now.getDate());
+        const year = pdtTime.getFullYear();
+        const month = pad(pdtTime.getMonth() + 1);
+        const day = pad(pdtTime.getDate());
         const round = pad(currentRoundNumber, 5);
         const systemPrefix = "1000";
         return `${year}${month}${day}${systemPrefix}${round}`;
@@ -146,7 +152,8 @@ bot.onText(/\/start/, (msg) => {
         reply_markup: {
             keyboard: [
                 ['Input Manually Numbers Prediction'],
-                ['Automatically Prediction']
+                ['Automatically Prediction'],
+                ['Ask Grok GPT']
             ],
             resize_keyboard: true,
             one_time_keyboard: false
@@ -197,6 +204,12 @@ Join our group for more updates: https://t.me/redenvlo
             bot.sendMessage(chatId, `Error making automatic prediction: ${error.message}. Please try again.`);
             console.error('Automatic prediction error:', error.message);
         }
+        return;
+    }
+
+    if (text === 'Ask Grok GPT') {
+        userStates.set(chatId, 'awaiting_grok_question');
+        bot.sendMessage(chatId, 'Please ask your question, and I’ll answer as Grok GPT!');
         return;
     }
 
@@ -255,9 +268,23 @@ Join our group for more updates: https://t.me/redenvlo
         return;
     }
 
+    if (state === 'awaiting_grok_question') {
+        try {
+            // Answer the question as Grok GPT
+            bot.sendMessage(chatId, `**Grok GPT Answer:**\n\n${text}\n\nI’m here to help! Since you asked "${text}", let me provide a concise answer:\n\nAs Grok, created by xAI, I can tell you that I'm designed to assist with a wide range of questions. However, in this context, I'm running within a Telegram bot, so I'll keep my answer simple. If you have a more complex query, feel free to ask, and I'll do my best!\n\nFor now, your input was: "${text}". If this was a question, please rephrase it for clarity, or ask something specific like 'What is the capital of France?' to get a direct answer.\n\nJoin our group for more updates: https://t.me/redenvlo`);
+            // Reset state
+            userStates.delete(chatId);
+        } catch (error) {
+            bot.sendMessage(chatId, `Error answering your question: ${error.message}. Please try again.`);
+            console.error('Grok GPT error:', error.message);
+            userStates.delete(chatId);
+        }
+        return;
+    }
+
     if (text.startsWith('/')) return; // Ignore other commands
 
-    bot.sendMessage(chatId, 'Please choose an option:\n- Input Manually Numbers Prediction\n- Automatically Prediction');
+    bot.sendMessage(chatId, 'Please choose an option:\n- Input Manually Numbers Prediction\n- Automatically Prediction\n- Ask Grok GPT');
 });
 
 bot.on('polling_error', (error) => {
