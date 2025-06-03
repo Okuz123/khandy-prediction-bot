@@ -7,22 +7,6 @@ const bot = new TelegramBot(token, { polling: true });
 // Store user states
 const userStates = new Map();
 
-// Motivational quotes
-const motivationalQuotes = [
-    "Believe you can and you're halfway there. – Theodore Roosevelt",
-    "The only way to do great work is to love what you do. – Steve Jobs",
-    "Success is not the absence of obstacles, but the courage to push through. – Unknown",
-    "Your time is limited, don’t waste it living someone else’s life. – Steve Jobs",
-    "Hardships often prepare ordinary people for an extraordinary destiny. – C.S. Lewis",
-    "Don’t watch the clock; do what it does. Keep going. – Sam Levenson",
-    "The future belongs to those who believe in the beauty of their dreams. – Eleanor Roosevelt"
-];
-
-// Get a random motivational quote
-function getRandomQuote() {
-    return motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
-}
-
 // Pi digits for prediction
 const PI_DIGITS = '1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679' +
     '8214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196' +
@@ -35,59 +19,11 @@ const PI_DIGITS = '1415926535897932384626433832795028841971693993751058209749445
     '0244594553469083026425223082533446850352619311881710100031378387528865875332083814206171776691473035' +
     '9825349042875546873115956286388235378759375195778185778053217122680661300192787661119590921642019893';
 
-// Utility function to pad numbers
-function pad(n, width = 2) {
-    return n.toString().padStart(width, '0');
-}
-
-// Calculate the current period number (base time: today at 00:00:00 in Oregon PDT, UTC-7)
-function fetchPeriodNumber() {
-    try {
-        // Get current time in UTC
-        const now = new Date();
-        // Convert to PDT (UTC-7) - Oregon is on PDT in June 2025
-        const pdtOffsetMinutes = -7 * 60; // UTC-7
-        const pdtTime = new Date(now.getTime() + (pdtOffsetMinutes * 60 * 1000));
-
-        // Base time: today at 00:00:00 in PDT
-        const baseTime = new Date(pdtTime.getFullYear(), pdtTime.getMonth(), pdtTime.getDate(), 0, 0, 0);
-        const baseRoundNumber = 9671;
-        const diffMinutes = Math.floor((pdtTime - baseTime) / 60000);
-        const currentRoundNumber = baseRoundNumber + diffMinutes;
-        const year = pdtTime.getFullYear();
-        const month = pad(pdtTime.getMonth() + 1);
-        const day = pad(pdtTime.getDate());
-        const round = pad(currentRoundNumber, 5);
-        const systemPrefix = "1000";
-        return `${year}${month}${day}${systemPrefix}${round}`;
-    } catch (error) {
-        console.error('Error calculating period:', error.message);
-        return 'Unknown Period';
-    }
-}
-
-// Generate deterministic numbers from the period number
-function generateNumbersFromPeriod(period) {
-    try {
-        const seed = parseInt(period.slice(-5)); // Use last 5 digits of period (the round number)
-        const numbers = [];
-        let currentSeed = seed;
-
-        for (let i = 0; i < 3; i++) {
-            currentSeed = (currentSeed * 9301 + 49297) % 233280; // Linear congruential generator
-            numbers.push(Math.floor((currentSeed / 233280) * 10)); // Map to 0-9
-        }
-        return numbers;
-    } catch (error) {
-        throw new Error(`Error generating numbers from period: ${error.message}`);
-    }
-}
-
-// Prediction methods (using deterministic numbers)
+// Prediction methods (using user-provided numbers)
 function matrix(inputs) {
     try {
-        if (!Array.isArray(inputs) || inputs.length !== 3 || inputs.some(num => isNaN(num) || num < 0 || num > 9)) {
-            throw new Error('Invalid input for Matrix prediction: Must be an array of 3 numbers between 0 and 9');
+        if (!Array.isArray(inputs) || inputs.length !== 7 || inputs.some(num => isNaN(num) || num < 0 || num > 9)) {
+            throw new Error('Invalid input for Matrix prediction: Must be an array of 7 numbers between 0 and 9');
         }
         const sum = inputs.reduce((a, b) => a + b, 0);
         return sum % 10;
@@ -98,8 +34,8 @@ function matrix(inputs) {
 
 function piBased(inputs) {
     try {
-        if (!Array.isArray(inputs) || inputs.length !== 3 || inputs.some(num => isNaN(num) || num < 0 || num > 9)) {
-            throw new Error('Invalid input for Pi-based prediction: Must be an array of 3 numbers between 0 and 9');
+        if (!Array.isArray(inputs) || inputs.length !== 7 || inputs.some(num => isNaN(num) || num < 0 || num > 9)) {
+            throw new Error('Invalid input for Pi-based prediction: Must be an array of 7 numbers between 0 and 9');
         }
         const inputSum = inputs.reduce((a, b) => a + b, 0);
         const index = inputSum % PI_DIGITS.length;
@@ -143,6 +79,15 @@ function formatAutoPrediction(number) {
     }
 }
 
+// Generate random numbers for automatic prediction
+function generateRandomNumbers(count) {
+    const numbers = [];
+    for (let i = 0; i < count; i++) {
+        numbers.push(Math.floor(Math.random() * 10)); // Random number between 0 and 9
+    }
+    return numbers;
+}
+
 // Telegram Bot Commands
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
@@ -151,16 +96,16 @@ bot.onText(/\/start/, (msg) => {
     const keyboard = {
         reply_markup: {
             keyboard: [
-                ['Input Manually Numbers Prediction'],
-                ['Automatically Prediction'],
-                ['Ask Grok GPT']
+                ['🔢 Input Manually Numbers Prediction'],
+                ['🎲 Automatically Prediction'],
+                ['📱 Open KHAND Prediction Hack']
             ],
             resize_keyboard: true,
             one_time_keyboard: false
         }
     };
 
-    bot.sendMessage(chatId, 'Welcome to Black and White KHNDY PREDICTION Bot!\n\nJoin our group for more updates: https://t.me/redenvlo\n\nChoose an option below:', keyboard);
+    bot.sendMessage(chatId, '✨ **Welcome to Black and White KHANDY PREDICTION Bot!** ✨\n\n📩 Join our group for more updates: https://t.me/redenvlo\n\n👇 **Choose an option below:**', keyboard, { parse_mode: 'Markdown' });
 });
 
 bot.on('message', (msg) => {
@@ -171,124 +116,16 @@ bot.on('message', (msg) => {
 
     const state = userStates.get(chatId);
 
-    if (text === 'Input Manually Numbers Prediction') {
+    if (text === '🔢 Input Manually Numbers Prediction') {
         userStates.set(chatId, 'awaiting_manual_numbers');
-        bot.sendMessage(chatId, 'add 3 manually numbers as\n\n1) ...\n2) ...\n3) ...\n\nCopy it and in place of ... Replace with manual numbers and send it to bot');
+        bot.sendMessage(chatId, '🔢 **Enter 7 numbers manually** in this format:\n\n1) ...\n2) ...\n3) ...\n4) ...\n5) ...\n6) ...\n7) ...\n\n📋 Copy the above format, replace "..." with numbers (0-9), and send it back to me! 😊', { parse_mode: 'Markdown' });
         return;
     }
 
-    if (text === 'Automatically Prediction') {
+    if (text === '🎲 Automatically Prediction') {
         try {
-            const period = fetchPeriodNumber();
-            const numbers = generateNumbersFromPeriod(period); // Deterministic numbers based on period
+            const numbers = generateRandomNumbers(7); // Generate 7 random numbers
             const piPrediction = piBased(numbers);
             const piResult = formatAutoPrediction(piPrediction);
-            const quote = getRandomQuote();
 
             const message = `
-*Automatic Prediction Result*
-
-**Period Number:** ${period}
-
-*Prediction:*
-Signal: ${piResult.bigSmall}
-Color: ${piResult.color}
-
-*Motivational Quote:*
-${quote}
-
-Join our group for more updates: https://t.me/redenvlo
-            `;
-            bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-        } catch (error) {
-            bot.sendMessage(chatId, `Error making automatic prediction: ${error.message}. Please try again.`);
-            console.error('Automatic prediction error:', error.message);
-        }
-        return;
-    }
-
-    if (text === 'Ask Grok GPT') {
-        userStates.set(chatId, 'awaiting_grok_question');
-        bot.sendMessage(chatId, 'Please ask your question, and I’ll answer as Grok GPT!');
-        return;
-    }
-
-    if (state === 'awaiting_manual_numbers') {
-        // Parse the user's message
-        const lines = text.split('\n').filter(line => line.trim().length > 0);
-        const numbers = lines.map(line => {
-            const match = line.match(/\d+\)\s*(\d+)/);
-            return match ? parseInt(match[1]) : null;
-        }).filter(num => num !== null);
-
-        if (numbers.length !== 3 || numbers.some(num => isNaN(num) || num < 0 || num > 9)) {
-            bot.sendMessage(chatId, 'Invalid format or numbers. Please use the format:\n\n1) 1\n2) 2\n3) 3\n\nNumbers must be between 0 and 9.');
-            return;
-        }
-
-        try {
-            const period = fetchPeriodNumber();
-            const deterministicNumbers = generateNumbersFromPeriod(period); // Use period-based numbers
-            const matrixPrediction = matrix(deterministicNumbers);
-            const piPrediction = piBased(deterministicNumbers);
-            const matrixResult = formatPrediction(matrixPrediction);
-            const piResult = formatPrediction(piPrediction);
-            const quote = getRandomQuote();
-
-            const message = `
-*Prediction Result*
-
-**Input Numbers (User Provided):** ${numbers.join(', ')}
-**Period Number:** ${period}
-
-*Matrix Prediction:*
-Number: ${matrixResult.number}
-Signal: ${matrixResult.bigSmall}
-Color: ${matrixResult.color}
-
-*Pi-Based Prediction:*
-Number: ${piResult.number}
-Signal: ${piResult.bigSmall}
-Color: ${piResult.color}
-
-*Motivational Quote:*
-${quote}
-
-Join our group for more updates: https://t.me/redenvlo
-            `;
-            bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-
-            // Reset state
-            userStates.delete(chatId);
-        } catch (error) {
-            bot.sendMessage(chatId, `Error making prediction: ${error.message}. Please try again.`);
-            console.error('Prediction error:', error.message);
-            userStates.delete(chatId);
-        }
-        return;
-    }
-
-    if (state === 'awaiting_grok_question') {
-        try {
-            // Answer the question as Grok GPT
-            bot.sendMessage(chatId, `**Grok GPT Answer:**\n\n${text}\n\nI’m here to help! Since you asked "${text}", let me provide a concise answer:\n\nAs Grok, created by xAI, I can tell you that I'm designed to assist with a wide range of questions. However, in this context, I'm running within a Telegram bot, so I'll keep my answer simple. If you have a more complex query, feel free to ask, and I'll do my best!\n\nFor now, your input was: "${text}". If this was a question, please rephrase it for clarity, or ask something specific like 'What is the capital of France?' to get a direct answer.\n\nJoin our group for more updates: https://t.me/redenvlo`);
-            // Reset state
-            userStates.delete(chatId);
-        } catch (error) {
-            bot.sendMessage(chatId, `Error answering your question: ${error.message}. Please try again.`);
-            console.error('Grok GPT error:', error.message);
-            userStates.delete(chatId);
-        }
-        return;
-    }
-
-    if (text.startsWith('/')) return; // Ignore other commands
-
-    bot.sendMessage(chatId, 'Please choose an option:\n- Input Manually Numbers Prediction\n- Automatically Prediction\n- Ask Grok GPT');
-});
-
-bot.on('polling_error', (error) => {
-    console.error('Polling error:', error.message);
-});
-
-console.log('Telegram bot is running on Render...');
